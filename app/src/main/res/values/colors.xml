@@ -1,0 +1,9 @@
+<resources>
+    <color name="nur_midnight_dark">#0B111E</color>
+    <color name="nur_surface_dark">#131D31</color>
+    <color name="nur_gold">#E5B962</color>
+    <color name="nur_gold_light">#F5D78E</color>
+    <color name="nur_emerald">#10B981</color>
+    <color name="nur_text_primary">#F8FAFC</color>
+    <color name="nur_text_secondary">#94A3B8</color>
+</resources>

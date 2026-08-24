@@ -1,0 +1,7 @@
+{
+  "name": "NUR",
+  "description": "NUR (نُور) — Premium Islamic Personal Companion for verified Qur'an, prayer times, Duas, Adhkar, Tasbih, Qibla, Ramadan, and Muslim AI.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
