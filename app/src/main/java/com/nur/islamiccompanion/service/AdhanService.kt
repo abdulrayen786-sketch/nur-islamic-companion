@@ -11,6 +11,9 @@ import com.nur.islamiccompanion.data.model.PrayerCalculationConfig
 import com.nur.islamiccompanion.data.model.PrayerName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -21,15 +24,18 @@ class AdhanService(private val context: Context) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     private val prayerTimeService = PrayerTimeService()
     private val preferencesDataStore = PreferencesDataStore(context)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var rescheduleJob: Job? = null
 
     /**
      * Schedules exact alarms for all upcoming daily prayers
      */
     fun rescheduleAlarms() {
-        CoroutineScope(Dispatchers.IO).launch {
+        rescheduleJob?.cancel()
+        rescheduleJob = serviceScope.launch {
             val settings = preferencesDataStore.userSettingsFlow.first()
+            cancelAllAlarms()
             if (!settings.enablePrayerNotifications) {
-                cancelAllAlarms()
                 return@launch
             }
 
@@ -69,6 +75,11 @@ class AdhanService(private val context: Context) {
                 scheduleExactAlarm(PrayerName.FAJR, tomorrowFajr.timestamp, tomorrowFajr.timeFormatted, requestCodeOffset = 10)
             }
         }
+    }
+
+    fun close() {
+        rescheduleJob?.cancel()
+        serviceScope.cancel()
     }
 
     private fun isPrayerAlarmEnabled(
@@ -132,8 +143,8 @@ class AdhanService(private val context: Context) {
                     pendingIntent
                 )
             }
-        } catch (e: SecurityException) {
-            e.printStackTrace()
+        } catch (_: SecurityException) {
+            // Exact-alarm access can change while the app is running.
         }
     }
 
@@ -189,10 +200,16 @@ class AdhanService(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-        } else {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            } else {
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            }
+        } catch (_: SecurityException) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
         }
 
         Toast.makeText(context, "Test alarm scheduled for $seconds seconds from now", Toast.LENGTH_SHORT).show()
